@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VynMesh">
+  <defs><linearGradient id="mesh" x1="12" y1="12" x2="52" y2="54" gradientUnits="userSpaceOnUse"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+  <rect width="64" height="64" rx="16" fill="#0a0f1e"/>
+  <path d="M14 17h10l8 21 8-21h10L37 51h-10L14 17Z" fill="url(#mesh)"/>
+  <path d="M38 13h12M43 18h9M46 23h7" stroke="#86efac" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="51" cy="13" r="2.5" fill="#86efac"/><circle cx="52" cy="18" r="2.5" fill="#22d3ee"/><circle cx="53" cy="23" r="2.5" fill="#60a5fa"/>
+</svg>
