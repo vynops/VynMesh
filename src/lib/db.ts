@@ -1,9 +1,11 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { hashPassword } from "@/lib/passwords";
 
 export const dataRoot = path.join(process.cwd(), "data");
 const dbPath = path.join(dataRoot, "vynmesh.db");
+const LEGACY_SEEDED_PASSWORD_HASH = "81a6096090bcdcb285f00dc48d7269f0:67733669fa483da3518e5a4b68da75a6e39c460facfe79a47bc052353d89f1b9d8c0970bc2f93dc457d99c1034590bc2afba842419897e1b4c94a3c1732f29b6";
 
 const SCHEMA_SQL = `
 create table if not exists workspaces (
@@ -15,13 +17,20 @@ create table if not exists users (
   id text primary key,
   email text not null unique,
   display_name text not null,
-  password_hash text
+  password_hash text,
+  must_change_password integer not null default 0 check (must_change_password in (0, 1))
 );
 create table if not exists workspace_memberships (
   workspace_id text not null references workspaces(id),
   user_id text not null references users(id),
   role text not null check (role in ('owner','admin','analyst','viewer')),
   primary key (workspace_id, user_id)
+);
+create table if not exists password_change_tokens (
+  token_hash text primary key,
+  user_id text not null references users(id) on delete cascade,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  expires_at integer not null
 );
 create table if not exists sources (
   id text primary key,
@@ -119,6 +128,7 @@ export function getDb() {
 function migrateExistingDatabase(database: Database.Database) {
   const userColumns = (database.prepare("pragma table_info(users)").all() as Array<{ name: string }>).map((column) => column.name);
   if (!userColumns.includes("password_hash")) database.exec("alter table users add column password_hash text");
+  if (!userColumns.includes("must_change_password")) database.exec("alter table users add column must_change_password integer not null default 0");
   const columns = (database.prepare("pragma table_info(sources)").all() as Array<{ name: string }>).map((column) => column.name);
   if (!columns.includes("secret_config")) database.exec("alter table sources add column secret_config text");
   const sourceSchema = (database.prepare("select sql from sqlite_master where type = 'table' and name = 'sources'").get() as { sql?: string } | undefined)?.sql ?? "";
@@ -127,13 +137,16 @@ function migrateExistingDatabase(database: Database.Database) {
   }
   const recordColumns = (database.prepare("pragma table_info(catalog_records)").all() as Array<{ name: string }>).map((column) => column.name);
   if (!recordColumns.includes("redacted_content")) database.exec("alter table catalog_records add column redacted_content text not null default ''");
+
+  database.prepare("update users set password_hash = ?, must_change_password = 1 where id = ? and password_hash = ?").run(hashPassword("changeme"), "user-admin", LEGACY_SEEDED_PASSWORD_HASH);
+  database.prepare("update users set password_hash = null where id = ? and password_hash = ?").run("user-demo", LEGACY_SEEDED_PASSWORD_HASH);
 }
 
 function seedWorkspace(database: Database.Database) {
   database.prepare("insert into workspaces (id, name) values (?, ?) on conflict (id) do nothing").run("workspace-northstar", "Northstar finance");
-  database.prepare("insert into users (id, email, display_name, password_hash) values (?, ?, ?, ?) on conflict (id) do update set password_hash = coalesce(users.password_hash, excluded.password_hash)").run("user-demo", "demo@vynmesh.local", "Demo Analyst", "81a6096090bcdcb285f00dc48d7269f0:67733669fa483da3518e5a4b68da75a6e39c460facfe79a47bc052353d89f1b9d8c0970bc2f93dc457d99c1034590bc2afba842419897e1b4c94a3c1732f29b6");
+  database.prepare("insert into users (id, email, display_name) values (?, ?, ?) on conflict (id) do update set display_name = excluded.display_name").run("user-demo", "demo@vynmesh.local", "Demo Analyst");
   database.prepare("insert into workspace_memberships (workspace_id, user_id, role) values (?, ?, ?) on conflict (workspace_id, user_id) do nothing").run("workspace-northstar", "user-demo", "owner");
-  database.prepare("insert into users (id, email, display_name, password_hash) values (?, ?, ?, ?) on conflict (email) do update set display_name = excluded.display_name, password_hash = coalesce(users.password_hash, excluded.password_hash)").run("user-admin", "admin@vynmesh.local", "Admin", "81a6096090bcdcb285f00dc48d7269f0:67733669fa483da3518e5a4b68da75a6e39c460facfe79a47bc052353d89f1b9d8c0970bc2f93dc457d99c1034590bc2afba842419897e1b4c94a3c1732f29b6");
+  database.prepare("insert into users (id, email, display_name, password_hash, must_change_password) values (?, ?, ?, ?, 1) on conflict (email) do update set display_name = excluded.display_name, password_hash = coalesce(users.password_hash, excluded.password_hash), must_change_password = case when users.password_hash is null then 1 else users.must_change_password end").run("user-admin", "admin@vynmesh.local", "Admin", hashPassword("changeme"));
   database.prepare("insert into workspace_memberships (workspace_id, user_id, role) values (?, ?, ?) on conflict (workspace_id, user_id) do update set role = excluded.role").run("workspace-northstar", "user-admin", "admin");
   database.prepare("insert into workspace_settings (workspace_id) values (?) on conflict (workspace_id) do nothing").run("workspace-northstar");
 }

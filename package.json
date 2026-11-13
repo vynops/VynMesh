@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "setup:production": "node scripts/setup.mjs --production",
     "dev": "next dev -p 3090",
     "build": "next build",
     "start": "next start -p 3090",

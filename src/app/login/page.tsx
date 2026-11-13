@@ -20,6 +20,10 @@ export default function LoginPage() {
       const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Sign in failed.");
+      if (result.mustChangePassword) {
+        router.replace("/change-password");
+        return;
+      }
       router.push("/");
       router.refresh();
     } catch (reason) {

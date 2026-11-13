@@ -28,14 +28,19 @@ VynMesh is designed to sit above databases, object storage, documents, events, l
 
 This repository contains the VynMesh console and its local ingestion foundation: file uploads, database and external-source connector adapters, a raw/curated data lake, searchable catalog, grounded AI investigations, workspace checks, and audit records. External connectors still require their provider credentials and live contract testing before production use.
 
-## Run locally
+## Install and run
 
 ```bash
-npm install
-npm run dev
+git clone https://github.com/vynops/VynMesh.git
+cd VynMesh
+npm run setup
 ```
 
-Open `http://localhost:3090`.
+Setup requires Git and Node.js 22 or newer. It installs dependencies, creates a private local configuration file, and starts the app at `http://localhost:3090`. No `.env` editing is required.
+
+Sign in as `admin@vynmesh.local` with the initial password `changeme`. VynMesh requires you to choose a new password of at least 12 characters before continuing.
+
+For a production build, run `npm run setup:production`. It installs dependencies, builds the app, and starts it bound to `127.0.0.1:3090`. Keep it private until the initial password is changed. Public production access still requires an operator-configured HTTPS reverse proxy and process manager.
 
 The main product routes are:
 

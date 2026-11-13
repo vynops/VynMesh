@@ -2,7 +2,7 @@
 
 ## What is now real, not just described
 
-- **Authentication**: `src/lib/oidc.ts` implements a real OIDC authorization-code + PKCE flow with JWKS-based RS256 signature verification (`/api/auth/login`, `/api/auth/callback`). It activates automatically when `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and `OIDC_REDIRECT_URI` are set, and the demo cookie login is disabled once it is. This still requires the operator to register a real client with their own identity provider (Entra ID, Okta, etc.) — no coding agent can create that registration.
+- **Authentication**: Fresh installs create `admin@vynmesh.local` with the initial password `changeme` and force a password change before granting an application session. The setup command binds the production server to localhost during bootstrap. OIDC remains available when configured with `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and `OIDC_REDIRECT_URI`; registering a client with an identity provider is still an operator task.
 - **Networked database connector**: `readPostgresSource` in `src/lib/connectors.ts` runs a real, admin-configured SQL query against any reachable PostgreSQL instance. It is available at the API/data-model level (`sources.kind = 'postgres'`, credentials in `sources.secret_config`, never returned by any API response); it is intentionally not exposed in the simplified UI to keep the UI plain-language.
 - **Governance enforcement, not just a label**: `src/lib/pii.ts` scans every ingested record for emails, phone numbers, SSNs, and credit-card-like numbers, masks them, and stores the result in `catalog_records.redacted_content`. Search and AI answers only ever return `redacted_content` — verified live: a record containing a real email and phone number was ingested, and the AI answer's evidence excerpt showed `[redacted]` in place of both.
 - **Ingestion reliability**: `src/lib/ingestion.ts` retries a failing connector up to 3 times with backoff; after exhausting retries it marks the source `attention` and writes a row to `dead_letters` with the error and attempt count — verified live against a deliberately broken source.
@@ -12,7 +12,7 @@
 
 ## What still requires infrastructure or a business process, not more code
 
-- A real identity provider client registration and real end users to sign in with it.
+- If single sign-on is required, a real identity-provider client registration and real end users to sign in with it.
 - A real, reachable PostgreSQL (or other) production database and real credentials to connect the `postgres` source kind to.
 - Real S3/SharePoint credentials for a genuine object-storage connector (the current document connector reads a local directory).
 - Multi-instance/multi-tenant deployment: SQLite and the in-memory rate limiter are single-process; a networked database and shared rate-limit store are required beyond one instance.
@@ -57,6 +57,6 @@ Define and test RPO/RTO targets before pilot approval. A backup that has not bee
 
 ## Security gate
 
-OIDC/Entra ID sign-in, per-source PII redaction, ingestion retries with dead-letter tracking, rate limiting, and security response headers are now implemented (see above). Still required before production access: secrets moved to a managed secret store, tenant isolation tested under real multi-tenant load, connector credentials scoped read-only at the database level, and a threat model covering prompt injection, data exfiltration, SQL abuse via configured connector queries, malicious documents, and cross-workspace access.
+Forced initial password rotation, optional OIDC/Entra ID sign-in, per-source PII redaction, ingestion retries with dead-letter tracking, rate limiting, and security response headers are implemented (see above). Do not expose a fresh install publicly before changing `changeme`. Still required before production access: secrets moved to a managed secret store, tenant isolation tested under real multi-tenant load, connector credentials scoped read-only at the database level, and a threat model covering prompt injection, data exfiltration, SQL abuse via configured connector queries, malicious documents, and cross-workspace access.
 
 The current model integration is OpenAI-compatible and only uses an endpoint when `MODEL_ENDPOINT` and `MODEL_API_KEY` are present. Provider responses must remain constrained to retrieved evidence and must be logged with policy-approved redaction.

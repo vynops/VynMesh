@@ -4,13 +4,14 @@ import { verifyPassword } from "@/lib/passwords";
 
 export type Session = { userId: string; workspaceId: string; role: "owner" | "admin" | "analyst" | "viewer" };
 export type CurrentUser = { userId: string; email: string; name: string; workspaceId: string; role: Session["role"] };
+export type AuthenticatedUser = CurrentUser & { mustChangePassword: boolean };
 
 export function authenticate(email: string, password: string) {
-  const row = getDb().prepare("select id, email, display_name, password_hash from users where lower(email) = lower(?)").get(email.trim()) as { id: string; email: string; display_name: string; password_hash: string | null } | undefined;
+  const row = getDb().prepare("select id, email, display_name, password_hash, must_change_password from users where lower(email) = lower(?)").get(email.trim()) as { id: string; email: string; display_name: string; password_hash: string | null; must_change_password: number } | undefined;
   if (!row?.password_hash || !verifyPassword(password, row.password_hash)) return null;
   const membership = getDb().prepare("select workspace_id, role from workspace_memberships where user_id = ? order by workspace_id limit 1").get(row.id) as { workspace_id: string; role: Session["role"] } | undefined;
   if (!membership) return null;
-  return { userId: row.id, email: row.email, name: row.display_name, workspaceId: membership.workspace_id, role: membership.role } satisfies CurrentUser;
+  return { userId: row.id, email: row.email, name: row.display_name, workspaceId: membership.workspace_id, role: membership.role, mustChangePassword: row.must_change_password === 1 } satisfies AuthenticatedUser;
 }
 
 export async function requireSession(): Promise<Session> {
