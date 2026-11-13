@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (!token) return NextResponse.json({ error: "Your password-change session expired. Sign in again." }, { status: 401 });
 
   const body = await request.json().catch(() => ({})) as { password?: string };
-  if (!body.password || body.password.length < 12 || body.password.length > 128) return NextResponse.json({ error: "Choose a password between 12 and 128 characters." }, { status: 400 });
+  if (!body.password || body.password.length < 8 || body.password.length > 128) return NextResponse.json({ error: "Choose a password between 8 and 128 characters." }, { status: 400 });
 
   const session = completeInitialPasswordChange(getDb(), token, body.password);
   if (!session) {

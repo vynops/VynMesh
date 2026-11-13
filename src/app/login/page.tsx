@@ -38,7 +38,7 @@ export default function LoginPage() {
       <form className="login-form" onSubmit={submit}>
         {error && <div className="login-alert"><AlertCircle size={15} /> {error}</div>}
         <h2 className="login-title">Sign In</h2>
-        <label>Email<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@vynmesh.local" /></label>
+        <label>Email<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="owner@vynmesh.local" /></label>
         <label>Password<div className="password-field"><input type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label="Show password">{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></label>
         <button className="login-button" type="submit" disabled={loading}>{loading ? <><Loader2 size={15} className="spin" /> Signing in…</> : "Sign in"}</button>
       </form>

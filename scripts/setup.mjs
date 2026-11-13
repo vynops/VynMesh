@@ -51,7 +51,7 @@ function runNpm(commandArgs) {
 runNpm(["ci"]);
 if (production) runNpm(["run", "build"]);
 
-console.log(`First login: admin@vynmesh.local / changeme. You must set a new password of at least 12 characters.`);
+console.log(`First login: owner@vynmesh.local / changeme. You must set a new password of at least 8 characters.`);
 if (production) {
   console.log("The production server will listen on 127.0.0.1:3090. Keep it private until the initial password is changed.");
   runNpm(["run", "start", "--", "--hostname", "127.0.0.1"]);

@@ -1,10 +1,12 @@
 import { getDb } from "@/lib/db";
 import { hashPassword } from "@/lib/passwords";
+import { setTeamMemberBlocked as setBlocked, type TeamRole } from "./team-access";
 
-export type TeamMember = { userId: string; email: string; name: string; role: "owner" | "admin" | "analyst" | "viewer" };
+export type TeamMember = { userId: string; email: string; name: string; role: TeamRole; isBlocked: boolean };
 
 export function listTeamMembers(workspaceId: string): TeamMember[] {
-  return getDb().prepare("select u.id as userId, u.email, u.display_name as name, m.role from workspace_memberships m join users u on u.id = m.user_id where m.workspace_id = ? order by case m.role when 'owner' then 0 when 'admin' then 1 when 'analyst' then 2 else 3 end, u.display_name").all(workspaceId) as TeamMember[];
+  const rows = getDb().prepare("select u.id as userId, u.email, u.display_name as name, m.role, m.is_blocked as isBlocked from workspace_memberships m join users u on u.id = m.user_id where m.workspace_id = ? order by case m.role when 'owner' then 0 when 'admin' then 1 when 'analyst' then 2 else 3 end, u.display_name").all(workspaceId) as Array<Omit<TeamMember, "isBlocked"> & { isBlocked: number }>;
+  return rows.map(({ isBlocked, ...member }) => ({ ...member, isBlocked: isBlocked === 1 }));
 }
 
 export function addTeamMember(workspaceId: string, actorId: string, input: { email: string; name: string; role: TeamMember["role"]; password: string }) {
@@ -33,6 +35,10 @@ export function removeTeamMember(workspaceId: string, actorId: string, userId: s
   if (current.role === "owner") ensureOwnerRemains(workspaceId, userId);
   db.prepare("delete from workspace_memberships where workspace_id = ? and user_id = ?").run(workspaceId, userId);
   db.prepare("insert into audit_events (workspace_id, user_id, action, resource_type, resource_id, details) values (?, ?, ?, ?, ?, ?)").run(workspaceId, actorId, "Team member removed", "user", userId, "{}");
+}
+
+export function setTeamMemberBlocked(workspaceId: string, actorId: string, userId: string, blocked: boolean) {
+  setBlocked(getDb(), workspaceId, actorId, userId, blocked);
 }
 
 function ensureOwnerRemains(workspaceId: string, userId: string) {

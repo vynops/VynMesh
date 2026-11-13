@@ -33,6 +33,8 @@ export async function GET(request: Request) {
     const memberCount = db.prepare("select count(*) as count from workspace_memberships where workspace_id = ?").get(workspaceId) as { count: number };
     const role = memberCount.count === 0 ? "owner" : "analyst";
     db.prepare("insert into workspace_memberships (workspace_id, user_id, role) values (?, ?, ?) on conflict (workspace_id, user_id) do nothing").run(workspaceId, userId, role);
+    const membership = db.prepare("select is_blocked from workspace_memberships where workspace_id = ? and user_id = ?").get(workspaceId, userId) as { is_blocked: number } | undefined;
+    if (!membership || membership.is_blocked) return NextResponse.redirect(new URL("/?error=Workspace+access+is+blocked.+Contact+an+administrator.", request.url));
     db.prepare("insert into audit_events (workspace_id, user_id, action, resource_type, resource_id, details) values (?, ?, ?, ?, ?, ?)").run(workspaceId, userId, "Signed in via SSO", "user", userId, JSON.stringify({ email }));
 
     const response = NextResponse.redirect(new URL("/", request.url));

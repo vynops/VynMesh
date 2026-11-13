@@ -35,7 +35,21 @@ export default function Home({ initialPage = "Dashboard" }: { initialPage?: Page
 
   async function loadState() { setLoading(true); try { const response = await fetch("/api/mesh", { cache: "no-store" }); if (!response.ok) throw new Error("Could not load your data."); setState(await response.json()); setError(""); } catch { setError("Could not reach VynMesh. Try refreshing."); } finally { setLoading(false); } }
   useEffect(() => { const timer = window.setTimeout(() => { void loadState(); }, 0); return () => window.clearTimeout(timer); }, []);
-  useEffect(() => { const timer = window.setTimeout(() => { void fetch("/api/auth/me").then((response) => response.ok ? response.json() : null).then((user) => { if (user) setCurrentUser(user); }); }, 0); return () => window.clearTimeout(timer); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetch("/api/auth/me", { cache: "no-store" }).then(async (response) => {
+        if (response.status === 401) {
+          router.replace("/login");
+          return null;
+        }
+        if (!response.ok) throw new Error("Could not verify your session.");
+        return response.json();
+      }).then((user) => {
+        if (user) setCurrentUser(user);
+      }).catch(() => setError("Could not verify your session. Try refreshing."));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [router]);
   useEffect(() => { const params = new URLSearchParams(window.location.search); const redirectError = params.get("error"); if (!redirectError) return; window.history.replaceState({}, "", window.location.pathname); const timer = window.setTimeout(() => setError(redirectError), 0); return () => window.clearTimeout(timer); }, []);
   async function mutate(action: string, payload: Record<string, string> = {}) { const response = await fetch("/api/mesh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...payload }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Something went wrong."); setState(result); return result as MeshState; }
   function navigate(nextPage: Page) { setPage(nextPage); router.push(nextPage === "Dashboard" ? "/" : nextPage === "Data Sources" ? "/sources" : nextPage === "Ask AI" ? "/ask" : nextPage === "Settings" ? "/settings" : "/team"); }

@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { hashPassword } from "@/lib/passwords";
+import { migrateTeamMembershipBlocks } from "./team-access";
+import { seedWorkspaceOwner } from "./workspace-seed";
 
 export const dataRoot = path.join(process.cwd(), "data");
 const dbPath = path.join(dataRoot, "vynmesh.db");
@@ -24,6 +26,7 @@ create table if not exists workspace_memberships (
   workspace_id text not null references workspaces(id),
   user_id text not null references users(id),
   role text not null check (role in ('owner','admin','analyst','viewer')),
+  is_blocked integer not null default 0 check (is_blocked in (0,1)),
   primary key (workspace_id, user_id)
 );
 create table if not exists password_change_tokens (
@@ -129,6 +132,7 @@ function migrateExistingDatabase(database: Database.Database) {
   const userColumns = (database.prepare("pragma table_info(users)").all() as Array<{ name: string }>).map((column) => column.name);
   if (!userColumns.includes("password_hash")) database.exec("alter table users add column password_hash text");
   if (!userColumns.includes("must_change_password")) database.exec("alter table users add column must_change_password integer not null default 0");
+  migrateTeamMembershipBlocks(database);
   const columns = (database.prepare("pragma table_info(sources)").all() as Array<{ name: string }>).map((column) => column.name);
   if (!columns.includes("secret_config")) database.exec("alter table sources add column secret_config text");
   const sourceSchema = (database.prepare("select sql from sqlite_master where type = 'table' and name = 'sources'").get() as { sql?: string } | undefined)?.sql ?? "";
@@ -144,8 +148,7 @@ function migrateExistingDatabase(database: Database.Database) {
 
 function seedWorkspace(database: Database.Database) {
   database.prepare("insert into workspaces (id, name) values (?, ?) on conflict (id) do nothing").run("workspace-northstar", "Northstar finance");
-  database.prepare("insert into users (id, email, display_name) values (?, ?, ?) on conflict (id) do update set display_name = excluded.display_name").run("user-demo", "demo@vynmesh.local", "Demo Analyst");
-  database.prepare("insert into workspace_memberships (workspace_id, user_id, role) values (?, ?, ?) on conflict (workspace_id, user_id) do nothing").run("workspace-northstar", "user-demo", "owner");
+  seedWorkspaceOwner(database);
   database.prepare("insert into users (id, email, display_name, password_hash, must_change_password) values (?, ?, ?, ?, 1) on conflict (email) do update set display_name = excluded.display_name, password_hash = coalesce(users.password_hash, excluded.password_hash), must_change_password = case when users.password_hash is null then 1 else users.must_change_password end").run("user-admin", "admin@vynmesh.local", "Admin", hashPassword("changeme"));
   database.prepare("insert into workspace_memberships (workspace_id, user_id, role) values (?, ?, ?) on conflict (workspace_id, user_id) do update set role = excluded.role").run("workspace-northstar", "user-admin", "admin");
   database.prepare("insert into workspace_settings (workspace_id) values (?) on conflict (workspace_id) do nothing").run("workspace-northstar");
