@@ -8,10 +8,21 @@ export async function answerWithModel(question: string, evidence: Evidence[], wo
   const endpoint = runtime.endpoint;
   const apiKey = runtime.apiKey;
   if (!endpoint || !apiKey) return { answer: fallbackAnswer(evidence), model: "grounded-retrieval-v1" };
-  const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: runtime.model, temperature: 0, messages: [{ role: "system", content: "Answer only from the supplied evidence. Cite sources as [n]. If evidence is insufficient, say so." }, { role: "user", content: JSON.stringify({ question, evidence: evidence.map((item, index) => ({ citation: `[${index + 1}] ${item.sourceName}: ${item.title}`, text: item.excerpt })) }) }] }) });
+  const system = "Answer only from the supplied evidence. Cite sources as [n]. If evidence is insufficient, say so.";
+  const user = JSON.stringify({ question, evidence: evidence.map((item, index) => ({ citation: `[${index + 1}] ${item.sourceName}: ${item.title}`, text: item.excerpt })) });
+  const anthropic = runtime.provider === "anthropic";
+  const headers: Record<string, string> = anthropic
+    ? { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
+    : { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+  const requestBody = anthropic
+    ? { model: runtime.model, max_tokens: 2048, system, messages: [{ role: "user", content: user }] }
+    : { model: runtime.model, temperature: 0, messages: [{ role: "system", content: system }, { role: "user", content: user }] };
+  const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(requestBody) });
   if (!response.ok) throw new Error(`Model provider returned ${response.status}.`);
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const answer = payload.choices?.[0]?.message?.content?.trim();
+  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; content?: Array<{ type?: string; text?: string }> };
+  const answer = anthropic
+    ? payload.content?.find((item) => item.type === "text")?.text?.trim()
+    : payload.choices?.[0]?.message?.content?.trim();
   if (!answer) throw new Error("Model provider returned an empty answer.");
   return { answer, model: runtime.model };
 }

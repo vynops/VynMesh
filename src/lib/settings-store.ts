@@ -1,8 +1,9 @@
 import { getDb } from "@/lib/db";
 import { decryptConfig, encryptConfig } from "@/lib/secrets";
+import { findAiProvider, resolveAiEndpoint } from "@/lib/ai-providers";
 
 export type WorkspaceSettings = { workspaceId: string; aiProvider: string; aiEndpoint: string; aiModel: string; aiSecretConfigured: boolean; retentionDays: number };
-export type AiRuntimeConfig = { endpoint: string; model: string; apiKey: string };
+export type AiRuntimeConfig = { provider: string; endpoint: string; model: string; apiKey: string };
 
 export function getWorkspaceSettings(workspaceId: string): WorkspaceSettings {
   const db = getDb();
@@ -19,7 +20,10 @@ export function saveWorkspaceSettings(workspaceId: string, userId: string, input
 
 export function getAiRuntimeConfig(workspaceId: string): AiRuntimeConfig {
   const db = getDb();
-  const row = db.prepare("select ai_endpoint, ai_model, ai_secret from workspace_settings where workspace_id = ?").get(workspaceId) as { ai_endpoint: string; ai_model: string; ai_secret: string | null } | undefined;
-  if (row?.ai_endpoint && row.ai_secret) return { endpoint: row.ai_endpoint, model: row.ai_model, apiKey: decryptConfig(row.ai_secret).apiKey };
-  return { endpoint: process.env.MODEL_ENDPOINT ?? "", model: process.env.MODEL_NAME ?? "default", apiKey: process.env.MODEL_API_KEY ?? "" };
+  const row = db.prepare("select ai_provider, ai_endpoint, ai_model, ai_secret from workspace_settings where workspace_id = ?").get(workspaceId) as { ai_provider: string; ai_endpoint: string; ai_model: string; ai_secret: string | null } | undefined;
+  if (row?.ai_endpoint && row.ai_secret) {
+    const provider = findAiProvider(row.ai_provider)?.id ?? "custom";
+    return { provider, endpoint: resolveAiEndpoint(provider, row.ai_endpoint), model: row.ai_model, apiKey: decryptConfig(row.ai_secret).apiKey };
+  }
+  return { provider: "custom", endpoint: process.env.MODEL_ENDPOINT ?? "", model: process.env.MODEL_NAME ?? "default", apiKey: process.env.MODEL_API_KEY ?? "" };
 }

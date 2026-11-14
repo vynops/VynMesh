@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 function key() {
   const value = process.env.CONNECTOR_CONFIG_KEY;
-  if (!value) throw new Error("CONNECTOR_CONFIG_KEY is required before saving connector credentials.");
+  if (!value) throw new Error("The server is missing CONNECTOR_CONFIG_KEY. Configure this stable encryption secret in the production environment before saving credentials.");
   return createHash("sha256").update(value).digest();
 }
 
